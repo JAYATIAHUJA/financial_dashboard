@@ -12,6 +12,13 @@ export type Transaction = {
   description: string;
 };
 
+export type SavingsGoal = {
+  id: string;
+  name: string;
+  target: number;
+  current: number;
+};
+
 // Seed data simulating 2 months of activity
 const initialTransactions: Transaction[] = [
   // Current month (May)
@@ -45,18 +52,25 @@ interface DashboardContextType {
   setCategoryFilter: (c: string) => void;
   typeFilter: 'All' | 'income' | 'expense';
   setTypeFilter: (t: 'All' | 'income' | 'expense') => void;
+  timeFilter: 'all' | '7days' | '30days';
+  setTimeFilter: (t: 'all' | '7days' | '30days') => void;
   sortOption: SortOption;
   setSortOption: (s: SortOption) => void;
   darkMode: boolean;
   setDarkMode: (d: boolean) => void;
+  savingsGoals: SavingsGoal[];
+  setSavingsGoals: (g: SavingsGoal[]) => void;
   categories: string[];
   totalIncome: number;
   totalExpense: number;
   totalBalance: number;
   expensesByCategory: { name: string; value: number }[];
+  incomeVsExpenseData: { month: string; income: number; expense: number }[];
   highestExpenseCategory: { name: string; value: number } | null;
   trendData: { date: string; balance: number }[];
-  monthlyComparison: { changePct: number, message: string };
+  monthlyComparison: { changePct: number, message: string, currentMonthExpenses: number };
+  monthlyBudget: number;
+  setMonthlyBudget: (b: number) => void;
   addTransaction: (tx: Omit<Transaction, 'id'>) => void;
   updateTransaction: (id: string, tx: Omit<Transaction, 'id'>) => void;
   deleteTransaction: (id: string) => void;
@@ -71,11 +85,26 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState<'All' | 'income' | 'expense'>('All');
+  const [timeFilter, setTimeFilter] = useState<'all' | '7days' | '30days'>('all');
   const [sortOption, setSortOption] = useState<SortOption>('date-desc');
   
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([
+    { id: '1', name: 'Emergency Fund', current: 150000, target: 500000 },
+    { id: '2', name: 'New Laptop', current: 30000, target: 120000 }
+  ]);
+
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('theme') === 'dark';
   });
+
+  const [monthlyBudget, setMonthlyBudget] = useState<number>(() => {
+    const saved = localStorage.getItem('findash_budget');
+    return saved ? parseFloat(saved) : 50000;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('findash_budget', monthlyBudget.toString());
+  }, [monthlyBudget]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
@@ -107,7 +136,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const matchCategory = categoryFilter === 'All' || t.category === categoryFilter;
       const matchType = typeFilter === 'All' || t.type === typeFilter;
       
-      return matchSearch && matchCategory && matchType;
+      const txDate = new Date(t.date).getTime();
+      const now = new Date('2024-05-15').getTime(); // Using mock "now" to match mock data dates
+      const daysDiff = (now - txDate) / (1000 * 3600 * 24);
+      let matchTime = true;
+      if (timeFilter === '7days') matchTime = daysDiff <= 7 && daysDiff >= 0;
+      if (timeFilter === '30days') matchTime = daysDiff <= 30 && daysDiff >= 0;
+      
+      return matchSearch && matchCategory && matchType && matchTime;
     });
 
     result.sort((a, b) => {
@@ -119,7 +155,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     });
 
     return result;
-  }, [transactions, searchQuery, categoryFilter, typeFilter, sortOption]);
+  }, [transactions, searchQuery, categoryFilter, typeFilter, timeFilter, sortOption]);
 
   const categories = useMemo(() => ['All', ...Array.from(new Set(transactions.map(t => t.category)))], [transactions]);
   const totalIncome = useMemo(() => transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0), [transactions]);
@@ -136,6 +172,30 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [transactions]);
 
   const highestExpenseCategory = expensesByCategory.length > 0 ? expensesByCategory[0] : null;
+
+  const incomeVsExpenseData = useMemo(() => {
+    const map = new Map<string, { income: number; expense: number }>();
+    
+    // Group transactions by month-year string (e.g., '2024-05')
+    transactions.forEach(t => {
+      const monthYear = t.date.substring(0, 7);
+      if (!map.has(monthYear)) {
+        map.set(monthYear, { income: 0, expense: 0 });
+      }
+      const data = map.get(monthYear)!;
+      if (t.type === 'income') data.income += t.amount;
+      else data.expense += t.amount;
+    });
+
+    const result = Array.from(map.entries()).map(([month, data]) => ({
+      month,
+      income: data.income,
+      expense: data.expense
+    }));
+    
+    // Sort array chronologically by month
+    return result.sort((a, b) => a.month.localeCompare(b.month));
+  }, [transactions]);
 
   const monthlyComparison = useMemo(() => {
     // Fallback logic for mock dates hardcoded above to ensure demo works
@@ -160,7 +220,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       return t.type === 'expense' && d.getMonth() === prevMonth && d.getFullYear() === prevYear;
     }).reduce((acc, t) => acc + t.amount, 0);
 
-    if (prevMonthExpenses === 0) return { changePct: 0, message: "No data for previous month." };
+    if (prevMonthExpenses === 0) return { changePct: 0, message: "No data for previous month.", currentMonthExpenses: currMonthExpenses };
     
     const diff = currMonthExpenses - prevMonthExpenses;
     const changePct = (diff / prevMonthExpenses) * 100;
@@ -168,16 +228,25 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       ? `Spending increased by ${Math.abs(changePct).toFixed(1)}% this month.`
       : `Spending decreased by ${Math.abs(changePct).toFixed(1)}% this month.`;
 
-    return { changePct, message };
+    return { changePct, message, currentMonthExpenses: currMonthExpenses };
   }, [transactions]);
 
   const trendData = useMemo(() => {
     const sorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     let currentBalance = 0;
-    return sorted.map(t => {
+    const dailyBalances: Record<string, number> = {};
+    const datesInOrder: string[] = [];
+    
+    sorted.forEach(t => {
       currentBalance += t.type === 'income' ? t.amount : -t.amount;
-      return { date: t.date.substring(5), balance: currentBalance }; 
+      const dateKey = t.date.substring(5);
+      if (!(dateKey in dailyBalances)) {
+        datesInOrder.push(dateKey);
+      }
+      dailyBalances[dateKey] = currentBalance;
     });
+
+    return datesInOrder.map(date => ({ date, balance: dailyBalances[date] }));
   }, [transactions]);
 
   const addTransaction = (tx: Omit<Transaction, 'id'>) => {
@@ -202,10 +271,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const value = {
     loading, role, setRole, transactions, filteredTransactions,
     searchQuery, setSearchQuery, categoryFilter, setCategoryFilter,
-    typeFilter, setTypeFilter, sortOption, setSortOption,
-    darkMode, setDarkMode, categories,
+    typeFilter, setTypeFilter, timeFilter, setTimeFilter, sortOption, setSortOption,
+    darkMode, setDarkMode, savingsGoals, setSavingsGoals, categories,
     totalIncome, totalExpense, totalBalance, expensesByCategory,
     highestExpenseCategory, trendData, monthlyComparison,
+    incomeVsExpenseData,
+    monthlyBudget, setMonthlyBudget,
     addTransaction, updateTransaction, deleteTransaction
   };
 

@@ -50,3 +50,13 @@ Using the Role selection dropdown:
 - Selecting **Admin** immediately injects privileged `+ Add` interfaces and inline transaction-modification commands.
 
 Enjoy analyzing your layout!
+
+## 🤔 Technical Decisions and Trade-offs
+
+During the development of FinDash, several key technical choices were made to explicitly balance performance, development velocity, and premium aesthetic requirements:
+
+1. **Context API over Redux/Zustand**: For state management, the native `Context API` paired with custom hooks (`useDashboard`) was chosen. It provides sufficient decoupling to prevent prop-drilling without the boilerplate or bundle size overhead of a heavier state library, which is ideal for a focused frontend dashboard.
+2. **Native CSS Variables for Theming**: Instead of an external css-in-js library (like styled-components or Emotion) or TailwindCSS, pure CSS custom variables (`[data-theme='dark']`) were utilized. This approach guarantees zero runtime overhead for style parsing while keeping dynamic dark/light mode transitions incredibly swift and buttery smooth.
+3. **Client-Side RBAC Simulation**: To keep the repository completely entirely self-contained and frontend-driven, the Role-Based Access Control (Viewer vs. Admin) is simulated via application-level state rather than secured by an external backend or JWT system. This speeds up the demonstration capacity but trades off strict security, which would be fundamentally required for production.
+4. **Recharts for Data Visualization**: `recharts` was chosen as a balanced middle-ground. It allows for declarative SVG charting within React easily. While D3.js would offer more custom flexibility, Recharts provides immediate stability, out-of-the-box responsiveness, and elegant React-native composition suitable for the project's tight scope.
+5. **WebGL Shader Integration**: Incorporating a WebGL canvas background significantly elevates the "premium" feel of the UI. The trade-off explicitly sacrifices some baseline rendering performance on lower-end devices to provide a top-tier aesthetic.

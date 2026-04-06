@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { 
   LayoutDashboard, Users, BarChart2, 
   CreditCard, FileText, Settings, LogOut,
-  Search, Bell, Plus, TrendingDown, TrendingUp, DollarSign, 
-  Download, Activity, Trash2, Edit2
+  Search, Bell, Plus, TrendingDown, TrendingUp, IndianRupee, 
+  Download, Activity, Trash2, Edit2, PieChart as PieChartIcon, CheckCircle
 } from 'lucide-react';
-import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, BarChart, Bar, YAxis, CartesianGrid, Legend } from 'recharts';
 import './App.css';
 import { ShaderBackground } from './ShaderBackground';
 import { DashboardProvider, useDashboard } from './DashboardContext';
@@ -17,10 +17,12 @@ function Dashboard() {
   const {
     loading, role, setRole, filteredTransactions,
     searchQuery, setSearchQuery, categoryFilter, setCategoryFilter,
-    typeFilter, setTypeFilter, sortOption, setSortOption, 
+    typeFilter, setTypeFilter, timeFilter, setTimeFilter, sortOption, setSortOption, 
     darkMode, setDarkMode, categories,
     totalIncome, totalExpense, totalBalance, expensesByCategory,
     highestExpenseCategory, trendData, monthlyComparison,
+    incomeVsExpenseData,
+    monthlyBudget, setMonthlyBudget,
     addTransaction, updateTransaction, deleteTransaction
   } = useDashboard();
 
@@ -31,6 +33,9 @@ function Dashboard() {
   const [newDesc, setNewDesc] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [newType, setNewType] = useState<'income'|'expense'>('expense');
+
+  const [isEditingBudget, setIsEditingBudget] = useState(false);
+  const [budgetInput, setBudgetInput] = useState(monthlyBudget?.toString() || '50000');
 
   const openAddModal = () => {
     setEditingId(null);
@@ -48,6 +53,15 @@ function Dashboard() {
     setNewCategory(tx.category);
     setNewType(tx.type);
     setIsModalOpen(true);
+  };
+
+  const handleBudgetSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(budgetInput);
+    if (!isNaN(val)) {
+      setMonthlyBudget(val);
+      setIsEditingBudget(false);
+    }
   };
 
   const handleTransactionSubmit = (e: React.FormEvent) => {
@@ -108,7 +122,7 @@ function Dashboard() {
         <div className="sidebar slide-in-left">
           <div className="logo-container">
             <div className="logo-icon-bg">
-              <DollarSign size={24} color="#1a1a1a" />
+              <IndianRupee size={24} color="#1a1a1a" />
             </div>
             <span>FinDash</span>
           </div>
@@ -174,10 +188,10 @@ function Dashboard() {
           <div className="top-metrics-grid">
             <div className="card yellow balance-card fade-in-up" style={{animationDelay: '0.2s'}}>
               <h3>Total Balance</h3>
-              <div className="card-value large-val">${totalBalance.toLocaleString()}</div>
+              <div className="card-value large-val">₹{totalBalance.toLocaleString()}</div>
               
               <div className="mini-insight">
-                <div className="mini-insight-label">Monthly Observation</div>
+                <div className="mini-insight-label">Monthly</div>
                 <div className="mini-insight-val">
                   {monthlyComparison.changePct > 0 
                       ? <span style={{color: '#a12d2d'}}>{monthlyComparison.message}</span> 
@@ -186,7 +200,25 @@ function Dashboard() {
               </div>
             </div>
 
-            <div className="card pink trend-card fade-in-up" style={{animationDelay: '0.3s'}}>
+            <div className="card green balance-card fade-in-up" style={{animationDelay: '0.3s'}}>
+              <h3>Income</h3>
+              <div className="card-value large-val">₹{totalIncome.toLocaleString()}</div>
+              <div className="mini-insight">
+                <div className="mini-insight-label">All Time</div>
+                <div className="mini-insight-val" style={{color: '#1e5a3a'}}>Gross Entry</div>
+              </div>
+            </div>
+
+            <div className="card blue balance-card fade-in-up" style={{animationDelay: '0.4s'}}>
+              <h3>Expenses</h3>
+              <div className="card-value large-val">₹{totalExpense.toLocaleString()}</div>
+              <div className="mini-insight">
+                <div className="mini-insight-label">All Time</div>
+                <div className="mini-insight-val" style={{color: '#1a4e8a'}}>Outflow</div>
+              </div>
+            </div>
+
+            <div className="card pink trend-card fade-in-up" style={{animationDelay: '0.5s'}}>
               <div className="trend-header">
                 <div>
                   <h3>Balance Trend</h3>
@@ -198,7 +230,7 @@ function Dashboard() {
               </div>
               <div className="trend-chart-mini">
                 {trendData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <AreaChart data={trendData}>
                       <defs>
                         <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
@@ -206,9 +238,11 @@ function Dashboard() {
                           <stop offset="95%" stopColor="#1a1a1a" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
-                      <Tooltip 
+                      <XAxis dataKey="date" hide />
+                      <RechartsTooltip 
                         contentStyle={{ borderRadius: '10px', border: 'none', background: '#fff', color: '#1a1a1a', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} 
-                        formatter={(value: number) => [`$${value}`, 'Balance']}
+                        formatter={(value: any) => [`₹${value}`, 'Balance'] as any}
+                        labelFormatter={(label: any) => `Date: ${label}`}
                       />
                       <Area type="monotone" dataKey="balance" stroke="#1a1a1a" strokeWidth={3} fillOpacity={1} fill="url(#colorBalance)" />
                     </AreaChart>
@@ -229,6 +263,11 @@ function Dashboard() {
                   <option value="date-asc">Oldest First</option>
                   <option value="amount-desc">Highest Amount</option>
                   <option value="amount-asc">Lowest Amount</option>
+                </select>
+                <select value={timeFilter} onChange={e => setTimeFilter(e.target.value as any)} className="category-dropdown">
+                  <option value="all">All Time</option>
+                  <option value="30days">Last 30 Days</option>
+                  <option value="7days">Last 7 Days</option>
                 </select>
                 <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as 'All' | 'income' | 'expense')} className="category-dropdown">
                   <option value="All">All Types</option>
@@ -264,7 +303,7 @@ function Dashboard() {
                     </div>
                     <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
                       <div className={`tx-amount ${t.type}`}>
-                        {t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()}
+                        {t.type === 'income' ? '+' : '-'}₹{t.amount.toLocaleString()}
                       </div>
                       {role === 'admin' && (
                         <div className="tx-admin-actions">
@@ -285,13 +324,57 @@ function Dashboard() {
         {/* RIGHT PANEL */}
         <div className="right-panel slide-in-right">
           <h3 className="panel-title">Spending Insights</h3>
+
+          <div className="insight-card mb-2" style={{ padding: '1rem' }}>
+            <div className="insight-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <div className="insight-label" style={{ fontWeight: 600 }}>Monthly Budget Progress</div>
+              {role === 'admin' && !isEditingBudget && (
+                <button onClick={() => { setIsEditingBudget(true); setBudgetInput(monthlyBudget.toString()); }} className="action-btn" title="Edit Budget" style={{ padding: 0 }}>
+                  <Edit2 size={12} />
+                </button>
+              )}
+            </div>
+
+            {isEditingBudget ? (
+              <form onSubmit={handleBudgetSubmit} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input 
+                  type="number" 
+                  className="form-control" 
+                  style={{ padding: '4px 8px', fontSize: '0.85rem' }} 
+                  value={budgetInput} 
+                  onChange={e => setBudgetInput(e.target.value)} 
+                  autoFocus
+                />
+                <button type="submit" className="action-btn"><CheckCircle size={14} color="#2c7a51" /></button>
+              </form>
+            ) : (
+              <div className="insight-value" style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>
+                ₹{monthlyComparison.currentMonthExpenses.toLocaleString()} <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 400 }}>/ ₹{monthlyBudget.toLocaleString()}</span>
+              </div>
+            )}
+            
+            <div className="progress-bar-container" style={{ width: '100%', height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+              <div 
+                className="progress-bar-fill" 
+                style={{ 
+                  height: '100%', 
+                  width: `${Math.min((monthlyComparison.currentMonthExpenses / monthlyBudget) * 100, 100)}%`,
+                  background: (monthlyComparison.currentMonthExpenses / monthlyBudget) > 0.9 ? '#e53e3e' : '#38a169',
+                  transition: 'width 0.3s ease, background 0.3s ease'
+                }}
+              />
+            </div>
+            <div style={{ fontSize: '0.75rem', marginTop: '0.4rem', color: '#888', textAlign: 'right' }}>
+              {((monthlyComparison.currentMonthExpenses / monthlyBudget) * 100).toFixed(1)}% Used
+            </div>
+          </div>
           
           <div className="insight-card mb-2">
             <div className="insight-icon yellow-bg"><PieChartIcon size={20} /></div>
             <div>
               <div className="insight-label">Highest Expense</div>
               <div className="insight-value">
-                {highestExpenseCategory ? `${highestExpenseCategory.name} ($${highestExpenseCategory.value})` : 'N/A'}
+                {highestExpenseCategory ? `${highestExpenseCategory.name} (₹${highestExpenseCategory.value})` : 'N/A'}
               </div>
             </div>
           </div>
@@ -307,10 +390,35 @@ function Dashboard() {
             </div>
           </div>
 
+          <h3 className="panel-title" style={{ marginTop: '2rem' }}>Income vs Expense</h3>
+          <div className="bar-chart-container" style={{ height: '250px', width: '100%', marginBottom: '1.5rem', flexShrink: 0 }}>
+            {incomeVsExpenseData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <BarChart data={incomeVsExpenseData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
+                  <YAxis hide />
+                  <RechartsTooltip 
+                    formatter={(value: any, name: any) => {
+                      const nameStr = String(name);
+                      return [`₹${value}`, nameStr.charAt(0).toUpperCase() + nameStr.slice(1)] as any;
+                    }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', background: 'var(--card-bg)', color: 'var(--text-main)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                  <Bar dataKey="income" fill="#38a169" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="expense" fill="#e53e3e" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="empty-state">No data available</div>
+            )}
+          </div>
+
           <h3 className="panel-title" style={{ marginTop: '2rem' }}>Spending Breakdown</h3>
           <div className="pie-chart-container">
             {expensesByCategory.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <PieChart>
                   <Pie
                     data={expensesByCategory}
@@ -326,8 +434,8 @@ function Dashboard() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    formatter={(value: number) => `$${value}`} 
+                  <RechartsTooltip 
+                    formatter={(value: any) => `₹${value}` as any} 
                     contentStyle={{ borderRadius: '8px', border: 'none', background: 'var(--card-bg)', color: 'var(--text-main)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} 
                   />
                 </PieChart>
@@ -364,7 +472,7 @@ function Dashboard() {
                 </select>
               </div>
               <div className="form-group">
-                <label>Amount ($)</label>
+                <label>Amount (₹)</label>
                 <input required type="number" step="0.01" min="0.01" className="form-control" value={newAmount} onChange={e => setNewAmount(e.target.value)} placeholder="e.g. 50.00" />
               </div>
               <div className="form-group">

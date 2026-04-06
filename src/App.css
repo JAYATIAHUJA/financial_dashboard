@@ -166,10 +166,10 @@
 .greeting-section h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: 0.25rem; letter-spacing: -0.02em; }
 .greeting-section p { color: var(--text-secondary); font-size: 0.85rem; }
 
-/* TOP METRICS GRID (2 Cards layout) */
+/* TOP METRICS GRID */
 .top-metrics-grid {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: 1fr 1fr 1fr 2.5fr;
   gap: 1.25rem;
   margin-bottom: 1.5rem;
   flex-shrink: 0;
@@ -186,6 +186,8 @@
 
 .card.yellow { background-color: var(--card-yellow); }
 .card.pink { background-color: var(--card-pink); }
+.card.green { background-color: var(--card-green); }
+.card.blue { background-color: var(--card-blue); }
 
 .balance-card h3 { font-size: 1rem; font-weight: 500; opacity: 0.8; margin-bottom: 0.5rem; }
 .large-val { font-size: 2.25rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: auto; }
@@ -309,12 +311,13 @@
 
 /* RIGHT PANEL */
 .right-panel {
-  width: 280px;
+  width: 320px;
   padding: 0.5rem;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow-y: auto;
 }
 
 .panel-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }

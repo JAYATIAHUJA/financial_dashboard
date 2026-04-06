@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 const vertexShaderSource = `
   attribute vec2 position;
@@ -13,30 +13,70 @@ const fragmentShaderSource = `
   uniform vec2 resolution;
   uniform float isDark;
 
+  // Random / Noise functions for generating Clouds
+  float random(vec2 st) {
+      return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+  }
+
+  float noise(vec2 st) {
+      vec2 i = floor(st);
+      vec2 f = fract(st);
+      vec2 u = f * f * (3.0 - 2.0 * f); // Smooth interpolation
+      return mix(mix(random(i + vec2(0.0,0.0)), random(i + vec2(1.0,0.0)), u.x),
+                 mix(random(i + vec2(0.0,1.0)), random(i + vec2(1.0,1.0)), u.x), u.y);
+  }
+
+  // Fractional Brownian Motion (fBm) for cloudy fractals
+  float fbm(vec2 st) {
+      float value = 0.0;
+      float amplitude = 0.55; // Boost amplitude for higher contrast
+      for (int i = 0; i < 5; i++) {
+          value += amplitude * noise(st);
+          st *= 2.0;
+          amplitude *= 0.5;
+      }
+      return value;
+  }
+
   void main() {
     vec2 uv = gl_FragCoord.xy / resolution.xy;
+    uv.x *= resolution.x / resolution.y; // Correct aspect ratio for thick clouds
     
-    // Slow, subtle movement
-    float f = sin(uv.x * 2.0 + time * 0.15) * sin(uv.y * 2.0 + time * 0.1) * 0.5 + 0.5;
-    float f2 = sin(uv.x * 4.0 - time * 0.2) * cos(uv.y * 3.0 + time * 0.1) * 0.5 + 0.5;
+    vec2 p = uv * 3.0; // Scale of the clouds
     
-    // Light mode palette (cream / very soft pastel)
-    vec3 lightColor1 = vec3(0.98, 0.95, 0.92); // #faf2ec base
-    vec3 lightColor2 = vec3(0.95, 0.92, 0.96); // slight purple tint
-    vec3 lightColor3 = vec3(0.99, 0.90, 0.90); // slight pink tint
+    // Abstract Cloud Domain Warping
+    vec2 q = vec2(0.0);
+    q.x = fbm(p + 0.1 * time);
+    q.y = fbm(p + vec2(1.0));
     
-    // Dark mode palette (deep dark gray/soft black)
-    vec3 darkColor1 = vec3(0.06, 0.06, 0.06); // #101010 base
-    vec3 darkColor2 = vec3(0.08, 0.06, 0.10); // slight dark purple
-    vec3 darkColor3 = vec3(0.10, 0.08, 0.08); // slight dark red
+    vec2 r = vec2(0.0);
+    r.x = fbm(p + 1.0 * q + vec2(1.7, 9.2) + 0.15 * time);
+    r.y = fbm(p + 1.0 * q + vec2(8.3, 2.8) + 0.126 * time);
+    
+    float f = fbm(p + r);
+    f = smoothstep(0.1, 0.9, f); // Dramatic contrast boost
+    
+    // Light mode palette: VERY distinct visible clouds
+    vec3 lightColor1 = vec3(0.65, 0.70, 0.85); // Deep cloud shadow (Blueish gray)
+    vec3 lightColor2 = vec3(0.95, 0.85, 0.90); // Midtone mist (Pinkish)
+    vec3 lightColor3 = vec3(1.0, 1.0, 1.0);    // Bright fluffy highlights (White)
+    
+    // Dark mode palette: Extremely punchy nebulae
+    vec3 darkColor1 = vec3(0.02, 0.02, 0.06);  // Pitch black void
+    vec3 darkColor2 = vec3(0.20, 0.10, 0.35);  // Bright purple nebula clouds
+    vec3 darkColor3 = vec3(0.10, 0.40, 0.50);  // Electrifying cyan edges
     
     vec3 color1 = mix(lightColor1, darkColor1, isDark);
     vec3 color2 = mix(lightColor2, darkColor2, isDark);
     vec3 color3 = mix(lightColor3, darkColor3, isDark);
     
-    // Blend them
-    vec3 finalColor = mix(color1, color2, f);
-    finalColor = mix(finalColor, color3, f2 * 0.5);
+    // Hard blend to clearly separate the colors
+    vec3 finalColor = mix(color1, color2, clamp(f * 1.5, 0.0, 1.0));
+    finalColor = mix(finalColor, color3, clamp(length(q) * f * 2.0, 0.0, 1.0));
+    
+    // Ultra minimal dither to prevent gradient banding
+    float dither = (random(uv + time) * 0.04) - 0.02;
+    finalColor += dither;
     
     gl_FragColor = vec4(finalColor, 1.0);
   }
@@ -116,11 +156,12 @@ export function ShaderBackground({ darkMode }: { darkMode: boolean }) {
       gl.uniform1f(timeUniformLocation, (Date.now() - startTime) / 1000);
       gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
       
-      // Smoothly transition between dark mode and light mode
-      const currentDark = gl.getUniform(program, isDarkUniformLocation) as number || 0;
-      const targetDark = darkRef.current;
-      const newDark = currentDark + (targetDark - currentDark) * 0.1;
-      gl.uniform1f(isDarkUniformLocation, newDark);
+      if (isDarkUniformLocation !== null) {
+        const currentDark = gl.getUniform(program, isDarkUniformLocation) as number || 0;
+        const targetDark = darkRef.current;
+        const newDark = currentDark + (targetDark - currentDark) * 0.05;
+        gl.uniform1f(isDarkUniformLocation, newDark);
+      }
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       animationFrameId = requestAnimationFrame(render);

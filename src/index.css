@@ -1,6 +1,6 @@
 :root {
   /* LIGHT THEME */
-  --bg-color: rgba(250, 242, 236, 0.85);
+  --bg-color: transparent;
   --sidebar-bg: #1a1a1a;
   --sidebar-text: #8c8c8c;
   --sidebar-text-hover: #ffffff;
@@ -20,7 +20,7 @@
 
 [data-theme='dark'] {
   /* DARK THEME */
-  --bg-color: rgba(16, 16, 16, 0.85);
+  --bg-color: transparent;
   --sidebar-bg: rgba(26, 26, 26, 0.9);
   --sidebar-text: #8c8c8c;
   --sidebar-text-hover: #ffffff;
